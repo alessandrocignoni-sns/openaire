@@ -11,15 +11,37 @@ def orario_leggibile(secondi_totali):
     secondi = secondi_totali % 60
     return f"{ore}h {minuti}m {secondi}s"
 
-# dati sull'autore
-cognome_autore = input("Cognome dell'autore: ")
-orcid_autore = input("Inserisci l'orcid dell'autore: ")
+# dati sull'organizzazione
+nome_organizzazione = input("Nome dell'organizzazione: ")
+ror_organizzazione = input("ROR dell'organizzazione: ")
 
-# definizione dei parametri della richiesta
-endpoint = "https://api.openaire.eu/graph/v2/researchProducts" # URL dell'endpoint delle API
-params = {
-    "authorOrcid": orcid_autore
+# definizione dei parametri della richiesta per trovare l'id dell'organizzazione
+# definizione dei parametri della richiesta per trovare le pubblicazioni dell'organizzazione
+endpoint_organizzazione = "https://api.openaire.eu/graph/v1/organizations"
+params_orgaizzazione = {
+    "pid": ror_organizzazione
 }
+headers_organizzazione = {
+    "accept": "application/json"
+}
+
+# inizio dello script
+inizio = time.perf_counter()
+
+# ottiene una risposta e la trasforma in dizionario
+risposta_organizzazione = requests.get(endpoint_organizzazione, headers=headers_organizzazione, params=params_orgaizzazione)
+if risposta_organizzazione.status_code == 200:
+    dati_organizzazione = risposta_organizzazione.json()
+else:
+    print(f"Impossibile recuperare i dati: {risposta_organizzazione.status_code}")
+
+#ottiene l'id dell'organizzazione
+tempo_passato = time.perf_counter() - inizio
+id_organizzazione = dati_organizzazione["results"][0]["id"]
+print(orario_leggibile(round(tempo_passato)), "Id organizzazione:", id_organizzazione)
+
+# definizione dei parametri della richiesta per trovare le pubblicazioni dell'organizzazione
+endpoint = "https://api.openaire.eu/graph/v2/researchProducts"
 headers = {
     "accept": "application/json"
 }
@@ -27,11 +49,8 @@ headers = {
 # variabili per la scrittura
 data_oggi = datetime.today()
 data_standard = data_oggi.strftime("%y%m%d")
-percorso_file = data_standard + "_" + cognome_autore +"_Works.csv"
+percorso_file = data_standard + "_" + nome_organizzazione +"_Pubblicazioni.csv"
 campi = ["doi", "titolo", "data"]
-
-# inizio dello script
-inizio = time.perf_counter()
 
 # controllo esistenza del file, eventuale creazione
 esistenza_file = os.path.exists(percorso_file)
@@ -41,34 +60,56 @@ if not esistenza_file:
     writer.writeheader()
     file_csv.flush()
 
+# parametri di paginazione
+page = 1
+page_size = 100
+totale_trovati = 0
+
 # ottiene una risposta e la trasforma in dizionario
-risposta = requests.get(endpoint, headers=headers, params=params)
-if risposta.status_code == 200:
+while True:
+    params = {
+        "relOrganizationId": id_organizzazione,
+        "page": page,
+        "pageSize": page_size
+    }
+    risposta = requests.get(endpoint, headers=headers, params=params)
+    if risposta.status_code != 200:
+        print(f"Impossibile recuperare i dati: {risposta.status_code}")
+        break
+
     tutti_dati = risposta.json()
-else:
-    print(f"Impossibile recuperare i dati: {risposta.status_code}")
 
-# ciclo i dati rilevanti delle pubblicazioni
-for i, pubblicazione in enumerate(tutti_dati["results"]):
-    titolo = pubblicazione["mainTitle"]
-    data = pubblicazione["publicationDate"]
+    # ciclo i dati rilevanti delle pubblicazioni
+    for i, pubblicazione in enumerate(tutti_dati["results"]):
+        titolo = pubblicazione["mainTitle"]
+        data = pubblicazione["publicationDate"]
 
-    #recupera il doi
-    doi = ""
-    pids = pubblicazione["pids"]
-    for pid in pids:
-        if pid["scheme"] == "doi":
-            doi = pid["value"]
-            break
+        #recupera il doi
+        doi = ""
+        pids = pubblicazione["pids"]
+        if pids != None:
+            for pid in pids:
+                if pid["scheme"] == "doi":
+                    doi = pid["value"]
+                    break
 
-    # forma la riga della pubblicazione
-    dati_pubblicazione = {"doi": doi, "titolo": titolo, "data": data}
+        # forma la riga della pubblicazione
+        dati_pubblicazione = {"doi": doi, "titolo": titolo, "data": data}
 
-    # scrive la riga nel CSV
-    tempo_passato = time.perf_counter() - inizio
-    writer.writerow(dati_pubblicazione)
-    file_csv.flush()
-    print(i + 1, ") ", orario_leggibile(round(tempo_passato)),":", dati_pubblicazione["titolo"])
+        # scrive la riga nel CSV
+        writer.writerow(dati_pubblicazione)
+        file_csv.flush()
+
+        # attesa API e segni di vita
+        tempo_passato = time.perf_counter() - inizio
+        totale_trovati += 1
+        time.sleep(0.1)
+        print(totale_trovati, ") ", orario_leggibile(round(tempo_passato)),":", dati_pubblicazione["titolo"])
+
+    if len(tutti_dati["results"]) < page_size:
+        break
+
+    page += 1
 
 # scrive i dati in un file CSV
 file_csv.close()
