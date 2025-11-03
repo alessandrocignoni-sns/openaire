@@ -97,7 +97,6 @@ while True:
         dati_pubblicazione = {"doi": doi, "titolo": titolo, "data": data}
 
         # scrive la riga nel CSV
-        tempo_passato = time.perf_counter() - inizio
         writer.writerow(dati_pubblicazione)
         file_csv.flush()
 
@@ -116,4 +115,5 @@ while True:
 
 # scrive i dati in un file CSV
 file_csv.close()
+
 print("Completato.")
