@@ -65,55 +65,57 @@ page = 1
 page_size = 100
 totale_trovati = 0
 
-# ottiene una risposta e la trasforma in dizionario
-while True:
-    params = {
-        "relOrganizationId": id_organizzazione,
-        "page": page,
-        "pageSize": page_size
-    }
-    risposta = requests.get(endpoint, headers=headers, params=params)
-    if risposta.status_code != 200:
-        print(f"Impossibile recuperare i dati: {risposta.status_code}")
-        break
+# divide la richiesta per anni per evitare il limite di 10k risultati
+params = {}
+for anno in range(1950, 2026):
+    page = 1 # reset pagina per ogni anno
+    params["fromPublicationDate"] = f"{anno}-01-01"
+    params["toPublicationDate"] = f"{anno}-12-31"
+    print(f"Pubblicazioni del {anno}.")
+    # esegue la paginazione
+    while True:
+        params["relOrganizationId"] = id_organizzazione
+        params["page"] = page
+        params["pageSize"] = page_size
+        risposta = requests.get(endpoint, headers=headers, params=params)
+        if risposta.status_code != 200:
+            print(f"Impossibile recuperare i dati: {risposta.status_code}")
+            break
 
-    tutti_dati = risposta.json()
+        tutti_dati = risposta.json()
 
-    # ciclo i dati rilevanti delle pubblicazioni
-    for i, pubblicazione in enumerate(tutti_dati["results"]):
-        titolo = pubblicazione["mainTitle"]
-        data = pubblicazione["publicationDate"]
+        # ciclo i dati rilevanti delle pubblicazioni
+        for i, pubblicazione in enumerate(tutti_dati["results"]):
+            titolo = pubblicazione["mainTitle"]
+            data = pubblicazione["publicationDate"]
 
-        #recupera il doi
-        doi = ""
-        pids = pubblicazione["pids"]
-        if pids != None:
-            for pid in pids:
-                if pid["scheme"] == "doi":
-                    doi = pid["value"]
-                    break
+            #recupera il doi
+            doi = ""
+            pids = pubblicazione["pids"]
+            if pids != None:
+                for pid in pids:
+                    if pid["scheme"] == "doi":
+                        doi = pid["value"]
+                        break
 
-        # forma la riga della pubblicazione
-        dati_pubblicazione = {"doi": doi, "titolo": titolo, "data": data}
+            # forma la riga della pubblicazione
+            dati_pubblicazione = {"doi": doi, "titolo": titolo, "data": data}
 
-        # scrive la riga nel CSV
-        writer.writerow(dati_pubblicazione)
-        file_csv.flush()
+            # scrive la riga nel CSV
+            writer.writerow(dati_pubblicazione)
+            file_csv.flush()
 
-        # attesa API e segni di vita
-        tempo_passato = time.perf_counter() - inizio
-        totale_trovati += 1
-        time.sleep(0.1)
-        print(totale_trovati, ") ", orario_leggibile(round(tempo_passato)),":", dati_pubblicazione["titolo"])
+            # attesa API e segni di vita
+            tempo_passato = time.perf_counter() - inizio
+            totale_trovati += 1
+            print(totale_trovati, ") ", orario_leggibile(round(tempo_passato)),":", dati_pubblicazione["titolo"])
 
-    if len(tutti_dati["results"]) < page_size:
-        break
+        if len(tutti_dati["results"]) < page_size:
+            break
 
-    page += 1
-
-
+        page += 1
+        time.sleep(0.5)
 
 # scrive i dati in un file CSV
 file_csv.close()
-
 print("Completato.")
