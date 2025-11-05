@@ -16,7 +16,6 @@ nome_organizzazione = input("Nome dell'organizzazione: ")
 ror_organizzazione = input("ROR dell'organizzazione: ")
 
 # definizione dei parametri della richiesta per trovare l'id dell'organizzazione
-# definizione dei parametri della richiesta per trovare le pubblicazioni dell'organizzazione
 endpoint_organizzazione = "https://api.openaire.eu/graph/v1/organizations"
 params_orgaizzazione = {
     "pid": ror_organizzazione
@@ -27,6 +26,20 @@ headers_organizzazione = {
 
 # inizio dello script
 inizio = time.perf_counter()
+
+# variabili per la scrittura
+data_oggi = datetime.today()
+data_standard = data_oggi.strftime("%y%m%d")
+percorso_file = data_standard + "_" + nome_organizzazione +"_Pubblicazioni.csv"
+campi = ["doi", "titolo", "data"]
+
+# controllo esistenza del file, eventuale creazione
+esistenza_file = os.path.exists(percorso_file)
+file_csv = open(percorso_file, mode="a", newline="", encoding="utf-8")
+writer = csv.DictWriter(file_csv, fieldnames=campi)
+if not esistenza_file:
+    writer.writeheader()
+    file_csv.flush()
 
 # ottiene una risposta e la trasforma in dizionario
 risposta_organizzazione = requests.get(endpoint_organizzazione, headers=headers_organizzazione, params=params_orgaizzazione)
@@ -45,20 +58,6 @@ endpoint = "https://api.openaire.eu/graph/v2/researchProducts"
 headers = {
     "accept": "application/json"
 }
-
-# variabili per la scrittura
-data_oggi = datetime.today()
-data_standard = data_oggi.strftime("%y%m%d")
-percorso_file = data_standard + "_" + nome_organizzazione +"_Pubblicazioni.csv"
-campi = ["doi", "titolo", "data"]
-
-# controllo esistenza del file, eventuale creazione
-esistenza_file = os.path.exists(percorso_file)
-file_csv = open(percorso_file, mode="a", newline="", encoding="utf-8")
-writer = csv.DictWriter(file_csv, fieldnames=campi)
-if not esistenza_file:
-    writer.writeheader()
-    file_csv.flush()
 
 # parametri di paginazione
 page = 1
