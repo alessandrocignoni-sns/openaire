@@ -19,7 +19,7 @@ nome_file = input("Nome del file senza estensione: ")
 data_oggi = datetime.today()
 data_standard = data_oggi.strftime("%y%m%d")
 percorso_file = data_standard + "_" + nome_elenco +"_Pubblicazioni.csv"
-campi = ["codice_fiscale", "doi", "titolo", "data"]
+campi = ["cognome_nome", "doi", "titolo", "data"]
 
 # inizio dello script
 inizio = time.perf_counter()
@@ -32,14 +32,14 @@ if not esistenza_file:
     writer.writeheader()
     file_csv.flush()
 
-# Apri il file CSV e popola la lista dei professori
-lista_prof = []
+# Apri il file CSV e popola la lista degli autori
+lista_autori = []
 with open(nome_file + '.csv', mode='r', newline='', encoding='utf-8-sig') as file:
     reader = csv.DictReader(file)
     contenuto_csv = [riga for riga in reader]
 
 for riga in contenuto_csv:
-    lista_prof.append(riga)
+    lista_autori.append(riga)
 
 # parametri di paginazione
 page = 1
@@ -55,14 +55,15 @@ headers = {
 endpoint = "https://api.openaire.eu/graph/v2/researchProducts"
 
 # cicla sui professori, popolando la lista
-for professore in lista_prof:
-    print('Pubblicazioni di:', professore['codice_fiscale'])
+for autore in lista_autori:
+    cognome_nome = autore['COGNOME'] + " " + autore['NOME']
+    print('Pubblicazioni di:', cognome_nome)
     page = 1
 
     # ottiene una risposta per autore
     while True:
         params = {
-            "authorOrcid": professore['orcid'],
+            "authorOrcid": autore['ORCID'],
             "page": page,
             "pageSize": page_size
         }
@@ -79,7 +80,6 @@ for professore in lista_prof:
         for i, pubblicazione in enumerate(tutti_dati["results"]):
             titolo = pubblicazione["mainTitle"]
             data = pubblicazione["publicationDate"]
-            codice_fiscale = professore['codice_fiscale']
 
             #recupera il doi
             doi = ""
@@ -91,7 +91,7 @@ for professore in lista_prof:
                         break
 
             # forma la riga della pubblicazione
-            dati_pubblicazione = {"codice_fiscale": codice_fiscale, "doi": doi, "titolo": titolo, "data": data}
+            dati_pubblicazione = {"cognome_nome": cognome_nome, "doi": doi, "titolo": titolo, "data": data}
 
             # scrive la riga nel CSV
             tempo_passato = time.perf_counter() - inizio
